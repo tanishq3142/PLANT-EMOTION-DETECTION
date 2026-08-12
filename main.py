@@ -77,7 +77,10 @@ x = deque(maxlen=WINDOW_SIZE)
 y = deque(maxlen=WINDOW_SIZE)
 
 sample = 0
-current_bpm = 0
+current_bpm = None
+bpm_peak_times = deque(maxlen=10)
+ecgs_for_threshold = deque(maxlen=30)
+last_ecg = 0
 
 fig, ax = plt.subplots(figsize=(10, 5))
 
@@ -102,7 +105,7 @@ ax.grid(True)
 # ===========================
 
 def update(frame):
-    global sample, current_bpm
+    global sample, current_bpm, last_ecg
 
     while ser.in_waiting:
 
@@ -121,13 +124,33 @@ def update(frame):
 
             if len(parts) > 1:
                 try:
-                    current_bpm = int(parts[1])
-                except:
-                    pass
+                    incoming_bpm = int(parts[1])
+                except Exception:
+                    incoming_bpm = None
+            else:
+                incoming_bpm = None
+
+            ecgs_for_threshold.append(ecg)
+            threshold = max(512, min(ecgs_for_threshold) + (max(ecgs_for_threshold) - min(ecgs_for_threshold)) * 0.5)
+
+            if last_ecg < threshold <= ecg:
+                bpm_peak_times.append(time.time())
+                if len(bpm_peak_times) >= 2:
+                    intervals = [
+                        bpm_peak_times[i] - bpm_peak_times[i - 1]
+                        for i in range(1, len(bpm_peak_times))
+                    ]
+                    avg_interval = sum(intervals) / len(intervals)
+                    current_bpm = int(round(60.0 / avg_interval))
+
+            last_ecg = ecg
+
+            if incoming_bpm:
+                current_bpm = incoming_bpm
 
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
 
-            writer.writerow([timestamp, ecg, current_bpm])
+            writer.writerow([timestamp, ecg, current_bpm or 0])
             csv_file.flush()
 
             x.append(sample)
@@ -142,7 +165,7 @@ def update(frame):
 
     ax.set_xlim(max(0, sample - WINDOW_SIZE), sample)
 
-    bpm_text.set_text(f"BPM: {current_bpm}")
+    bpm_text.set_text(f"BPM: {current_bpm if current_bpm is not None else 0}")
 
     return line, bpm_text
 
