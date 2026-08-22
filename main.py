@@ -28,28 +28,25 @@ while not stimulus:
     stimulus = input("Please enter a stimulus: ").strip().lower()
     stimulus = re.sub(r"[^a-z0-9]+", "_", stimulus).strip("_")
 
-while True:
-    time_of_day = input("Time of day (morning, afternoon, or night): ").strip().lower()
-    if time_of_day in {"morning", "afternoon", "night"}:
-        break
-    print("Please enter morning, afternoon, or night.")
-
-while True:
-    recording_time_text = input("Time (24-hour format, HH:MM): ").strip()
-    try:
-        recording_time = datetime.strptime(recording_time_text, "%H:%M")
-        break
-    except ValueError:
-        print("Please enter the time in 24-hour format, for example 10:13.")
-
 start_time = datetime.now()
+hour = start_time.hour
+
+if hour < 12:
+    time_of_day = "morning"
+elif hour < 17:
+    time_of_day = "afternoon"
+else:
+    time_of_day = "night"
+
+print(f"Detected time of day: {time_of_day} ({start_time.strftime('%H:%M')})")
+
 date_folder = start_time.strftime("%Y-%m-%d")
 output_folder = os.path.join("csv", date_folder)
 os.makedirs(output_folder, exist_ok=True)
 
 filename = (
     f"plant_{stimulus}_{time_of_day}_"
-    f"{recording_time.strftime('%H')}hrs{recording_time.strftime('%M')}min.csv"
+    f"{start_time.strftime('%H')}hrs{start_time.strftime('%M')}min.csv"
 )
 filepath = os.path.join(output_folder, filename)
 
