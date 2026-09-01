@@ -1,136 +1,155 @@
-# Plant Emotion & Bio-Potential Detection
+# Plant Bio-potential Detection
 
-A Python-based system for capturing, logging, and visualizing real-time bio-potential (ECG/ADC) signals and heart-rate equivalents (BPM) from plants subjected to various environmental stimuli (e.g., water, music, touch, chemical stimuli).
+A Python system for capturing, labeling, visualizing, and classifying plant bio-potential signals from an Arduino connected to an AD8232 sensor.
 
----
+The project records experimental conditions such as water, music, touch, or baseline. It can then train a machine-learning model to recognize signal patterns associated with those labels. These predictions describe experimental plant states; they do not prove human-like emotions.
 
-## 📁 Repository Structure
+## Repository structure
 
-```
+```text
 PLANT-EMOTION-DETECTION/
-├── main.py            # Main hardware logger & live visualizer (connects to Arduino)
-├── plot_csv.py        # Visualizer script for reading and plotting CSV log files
-├── simulate_ecg.py    # Synthetic ECG data generator (for testing without hardware)
-├── csv/               # Folder storing output CSV files organized by date (YYYY-MM-DD)
-└── README.md          # Project documentation
+|-- main.py          # Arduino recorder and live signal display
+|-- plot_csv.py      # Live/static CSV signal visualizer
+|-- simulate_ecg.py  # Legacy synthetic ECG generator for display testing
+|-- train_model.py   # Feature extraction, model training, evaluation, prediction
+|-- overview.md      # Data dictionary and scientific/ML explanation
+|-- csv/             # Recordings grouped into YYYY-MM-DD directories
+`-- README.md
 ```
 
----
+## Requirements
 
-## ⚡ Prerequisites & Requirements
+- Python 3.8 or newer
+- Arduino and AD8232 for real recordings
+- `pyserial` for Arduino communication
+- `matplotlib` for graphs
+- `scikit-learn` for model training and prediction
 
-- **Python**: 3.8+ recommended
-- **Python Libraries**:
-  - `matplotlib` (for real-time and static graph rendering)
-  - `pyserial` (for reading serial input from Arduino)
-
-Install dependencies via pip:
-
-```bash
-python -m pip install matplotlib pyserial
-# Or on Windows using Python Launcher:
-py -m pip install matplotlib pyserial
-```
-
----
-
-## ⚡ Quick Start / Demo Commands
-
-If you have a virtual environment set up (e.g., in the parent directory), activate it first:
+Install the Python packages:
 
 ```powershell
-# Windows PowerShell
-cd PLANT-EMOTION-DETECTION
-..\.venv\Scripts\activate
+python -m pip install pyserial matplotlib scikit-learn
 ```
 
-### 🎯 Quick Demo: Plot Existing CSV Recording
-Run this command directly to plot sample recorded data:
+## 1. Capture a recording
 
-```bash
+Connect the Arduino, check its COM port, and run:
+
+```powershell
+python main.py --port COM7 --baud 9600
+```
+
+The CLI asks for the stimulus being monitored, for example:
+
+```text
+Stimulus (water, music, touch, none, etc.): water
+```
+
+The timestamp and time-of-day category are detected automatically. To skip the prompt:
+
+```powershell
+python main.py --stimulus water --port COM7 --baud 9600
+```
+
+Close the graph or press `Ctrl+C` to stop. The CSV is closed safely and stored as:
+
+```text
+csv/YYYY-MM-DD/plant_<stimulus>_<time_of_day>_<HH>hrs<MM>min<SS>sec.csv
+```
+
+Each hardware CSV contains:
+
+| Column | Purpose |
+|---|---|
+| `session_id` | Identifies one complete recording session. |
+| `timestamp` | Timezone-aware sample reception time. |
+| `elapsed_seconds` | Monotonic time since the session started. |
+| `sample_number` | Sequential sample index. |
+| `stimulus` | Experimental label used for learning. |
+| `time_of_day` | Automatically detected recording period. |
+| `ecg` | Raw 0–1023 Arduino ADC reading. |
+| `bpm` | Estimated electrical threshold-crossing rate per minute. |
+
+See [overview.md](overview.md) for the significance and limitations of every field.
+
+## 2. Plot a recording
+
+```powershell
 python plot_csv.py csv/2026-08-11/plant_water_morning_11hrs50min.csv
 ```
 
-### 🧪 Quick Demo: Live ECG Simulation (No Hardware Required)
-Test real-time graph animation without connecting physical sensors:
+The plot displays raw ADC readings and estimated event rate. It also updates while another process is adding rows to the CSV.
 
-**Terminal 1 (Start Simulator):**
-```bash
-python simulate_ecg.py csv/2026-08-11/demo.csv --duration 0 --rate 50
+## 3. Collect training data
+
+Before training, collect multiple independent sessions for each label. The code requires at least two sessions per label, but reliable research needs substantially more sessions and multiple plants.
+
+A simple balanced dataset might contain:
+
+```text
+none:   10 or more independent recordings
+water:  10 or more independent recordings
+music:  10 or more independent recordings
+touch:  10 or more independent recordings
 ```
 
-**Terminal 2 (Launch Live Plotter):**
-```bash
-python plot_csv.py csv/2026-08-11/demo.csv
+Keep the recording duration, plant conditions, sensor setup, and stimulus procedure as consistent as possible. Record a `none` baseline so the model can learn normal activity.
+
+## 4. Train and evaluate the model
+
+Train with all compatible CSV files under `csv/`:
+
+```powershell
+python train_model.py train --input "csv/**/*.csv" --window 10 --output plant_state_model.pkl
 ```
 
----
+Options:
 
-## 🚀 How to Run the Project
+| Option | Meaning |
+|---|---|
+| `--input` | Recursive glob selecting training CSV files. |
+| `--window` | Signal-window duration in seconds; default is 10. |
+| `--test-size` | Fraction of complete sessions reserved for testing; default is 0.25. |
+| `--seed` | Random seed for reproducible splitting and training. |
+| `--output` | Destination for the trained model file. |
 
-### 1. Live Recording with Hardware (`main.py`)
+For each waveform window, `train_model.py` extracts 14 features describing amplitude, variability, rate of change, peaks, energy, trend, event rate, and frequency-band power. A balanced random forest learns combinations of those features that distinguish the stimulus labels.
 
-Connect your Arduino or sensor board running an ECG/bio-potential sketch to your computer.
+Evaluation keeps complete sessions separate. Samples from one recording cannot appear in both training and testing. The CLI reports:
 
-1. Open [`main.py`](main.py) and ensure `PORT` and `BAUD_RATE` match your Arduino connection settings (default: `PORT = "COM7"`, `BAUD_RATE = 9600`).
-2. Run the script:
-   ```bash
-   python main.py
-   ```
-3. Provide the interactive prompts:
-   - **Stimulus added**: (e.g., `water`, `music`, `poison`, `human`)
-   - **Time of day**: (`morning`, `afternoon`, or `night`)
-   - **Time (HH:MM)**: 24-hour recording timestamp (e.g., `10:13`)
-4. A window will open displaying live ECG/ADC waveform data and real-time BPM calculation.
-5. The dataset will automatically save to `csv/YYYY-MM-DD/plant_<stimulus>_<time_of_day>_<HH>hrs<MM>min.csv`.
+- Precision, recall, and F1 score
+- Confusion matrix
+- Most influential signal features
+- Number of training and test sessions
 
----
+Old three-column CSV files and simulator files are skipped because they lack `session_id`, `stimulus`, and timing metadata.
 
-## 📊 How to Plot and View CSV Recordings (`plot_csv.py`)
+## 5. Predict a new recording
 
-To view previous recordings or inspect active data streams without restarting hardware collection:
+After capturing a new session, classify it with the saved model:
 
-```bash
-python plot_csv.py <path_to_csv_file>
+```powershell
+python train_model.py predict plant_state_model.pkl csv/2026-08-22/new_recording.csv
 ```
 
-**Example:**
-```bash
-python plot_csv.py csv/2026-08-11/plant_water_morning_11hrs50min.csv
+The model predicts every signal window and reports the majority label plus the vote count. Only load model files you created or trust, because Python pickle model files can execute code when loaded.
+
+## Simulation for graph testing
+
+The simulator tests visualization without Arduino hardware:
+
+```powershell
+python simulate_ecg.py csv/simulation.csv --duration 60 --rate 50
 ```
 
-Features:
-- Dual axis graph plotting raw ECG ADC values (`0-1023`) alongside calculated BPM.
-- Auto-updating plot window.
+In another terminal:
 
----
+```powershell
+python plot_csv.py csv/simulation.csv
+```
 
-## 🧪 How to Run ECG Simulation (`simulate_ecg.py`)
+Simulator output uses the legacy `timestamp,ecg,bpm` format. It is intended for graph testing and cannot train the new classifier because it has no real stimulus/session metadata.
 
-If you don't have physical hardware connected, you can simulate realistic ECG waveforms and plot them in real time.
+## Scientific limitation
 
-1. **Start the simulator in Terminal 1**:
-   ```bash
-   python simulate_ecg.py csv/2026-08-11/simulation.csv --duration 0 --rate 50
-   ```
-   *(Setting `--duration 0` runs the simulation continuously until stopped with `Ctrl+C`)*
-
-2. **Open the live visualizer in Terminal 2**:
-   ```bash
-   python plot_csv.py csv/2026-08-11/simulation.csv
-   ```
-
----
-
-## 📝 CSV File Data Format
-
-Logged CSV files generated by `main.py` or `simulate_ecg.py` follow this format:
-
-| timestamp | ecg | bpm |
-|---|---|---|
-| 2026-08-11 11:50:01.123 | 512 | 72 |
-| 2026-08-11 11:50:01.143 | 640 | 72 |
-
-- **`timestamp`**: ISO-like formatted date and time (`YYYY-MM-DD HH:MM:SS.mmm`)
-- **`ecg`**: 10-bit ADC integer value (`0 - 1023`)
-- **`bpm`**: Calculated pulse rate in beats per minute
+The AD8232 output is a plant bio-potential measurement influenced by physiology, electrode contact, movement, environmental electrical noise, temperature, light, and humidity. A successful classifier shows association with controlled labels; it does not by itself demonstrate consciousness or an emotion. Use repeatable protocols, unseen plants/sessions for testing, and independent validation.

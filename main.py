@@ -1,186 +1,156 @@
-import os
+import argparse
 import csv
+import os
 import re
 import time
-import serial
-from datetime import datetime
 from collections import deque
+from datetime import datetime
 
 import matplotlib.pyplot as plt
+import serial
 from matplotlib.animation import FuncAnimation
 
-# ===========================
-# Configuration
-# ===========================
-
-PORT = "COM7"
-BAUD_RATE = 9600
 WINDOW_SIZE = 200
+FIELDS = ["session_id", "timestamp", "elapsed_seconds", "sample_number", "stimulus",
+          "time_of_day", "ecg", "bpm"]
 
-# ===========================
-# Create output folder
-# ===========================
 
-stimulus = input("What stimulus are you adding (for example, water, poison, or music)? ").strip().lower()
-stimulus = re.sub(r"[^a-z0-9]+", "_", stimulus).strip("_")
+def clean_label(value):
+    return re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
 
-while not stimulus:
-    stimulus = input("Please enter a stimulus: ").strip().lower()
-    stimulus = re.sub(r"[^a-z0-9]+", "_", stimulus).strip("_")
 
-start_time = datetime.now()
-hour = start_time.hour
+def get_label(prompt, supplied=None):
+    value = clean_label(supplied or "")
+    while not value:
+        value = clean_label(input(prompt))
+        if not value:
+            print("A value is required.")
+    return value
 
-if hour < 12:
-    time_of_day = "morning"
-elif hour < 17:
-    time_of_day = "afternoon"
-else:
-    time_of_day = "night"
 
-print(f"Detected time of day: {time_of_day} ({start_time.strftime('%H:%M')})")
+def period(hour):
+    if 5 <= hour < 12:
+        return "morning"
+    if 12 <= hour < 17:
+        return "afternoon"
+    if 17 <= hour < 21:
+        return "evening"
+    return "night"
 
-date_folder = start_time.strftime("%Y-%m-%d")
-output_folder = os.path.join("csv", date_folder)
-os.makedirs(output_folder, exist_ok=True)
 
-filename = (
-    f"plant_{stimulus}_{time_of_day}_"
-    f"{start_time.strftime('%H')}hrs{start_time.strftime('%M')}min.csv"
-)
-filepath = os.path.join(output_folder, filename)
+def arguments():
+    parser = argparse.ArgumentParser(description="Record plant bio-potential data from Arduino/AD8232")
+    parser.add_argument("--port", default="COM7", help="Arduino port (default: COM7)")
+    parser.add_argument("--baud", type=int, default=9600, help="Serial baud rate")
+    parser.add_argument("--stimulus", help="Stimulus label; skips its prompt")
+    return parser.parse_args()
 
-csv_file = open(filepath, "w", newline="")
-writer = csv.writer(csv_file)
-writer.writerow(["timestamp", "ecg", "bpm"])
 
-print(f"Saving to: {filepath}")
+def main():
+    args = arguments()
+    stimulus = get_label("Stimulus (water, music, touch, none, etc.): ", args.stimulus)
+    started_at = datetime.now().astimezone()
+    time_of_day = period(started_at.hour)
+    session_id = started_at.strftime("%Y%m%dT%H%M%S%z")
+    folder = os.path.join("csv", started_at.strftime("%Y-%m-%d"))
+    os.makedirs(folder, exist_ok=True)
+    name = f"plant_{stimulus}_{time_of_day}_{started_at:%Hhrs%Mmin%Ssec}.csv"
+    path = os.path.join(folder, name)
 
-# ===========================
-# Connect to Arduino
-# ===========================
+    print(f"Session: {session_id}")
+    print(f"Local start: {started_at.isoformat(timespec='seconds')} ({time_of_day})")
+    print(f"Saving to: {path}")
 
-ser = serial.Serial(PORT, BAUD_RATE, timeout=1)
-time.sleep(2)
+    connection = None
+    output = None
+    try:
+        connection = serial.Serial(args.port, args.baud, timeout=1)
+        time.sleep(2)
+        connection.reset_input_buffer()
+        output = open(path, "w", newline="", encoding="utf-8")
+        writer = csv.DictWriter(output, fieldnames=FIELDS)
+        writer.writeheader()
+        output.flush()
 
-# Clear old data
-ser.reset_input_buffer()
+        samples = deque(maxlen=WINDOW_SIZE)
+        values = deque(maxlen=WINDOW_SIZE)
+        recent_values = deque(maxlen=30)
+        peaks = deque(maxlen=10)
+        state = {"number": 0, "rate": None, "previous": 0}
+        monotonic_start = time.perf_counter()
 
-# ===========================
-# Graph setup
-# ===========================
+        figure, axis = plt.subplots(figsize=(10, 5))
+        line, = axis.plot([], [], linewidth=1.5)
+        rate_text = axis.text(0.02, 0.95, "Event rate: --/min", transform=axis.transAxes, fontsize=14)
+        axis.set(title=f"Plant bio-potential: {stimulus}", xlabel="Sample", ylabel="ADC count")
+        axis.set_ylim(0, 1023)
+        axis.grid(True)
 
-x = deque(maxlen=WINDOW_SIZE)
-y = deque(maxlen=WINDOW_SIZE)
-
-sample = 0
-current_bpm = None
-bpm_peak_times = deque(maxlen=10)
-ecgs_for_threshold = deque(maxlen=30)
-last_ecg = 0
-
-fig, ax = plt.subplots(figsize=(10, 5))
-
-line, = ax.plot([], [], lw=1.5)
-
-bpm_text = ax.text(
-    0.02,
-    0.95,
-    "BPM: --",
-    transform=ax.transAxes,
-    fontsize=14,
-)
-
-ax.set_title("Live ECG")
-ax.set_xlabel("Sample")
-ax.set_ylabel("ADC")
-ax.set_ylim(0, 1023)
-ax.grid(True)
-
-# ===========================
-# Update
-# ===========================
-
-def update(frame):
-    global sample, current_bpm, last_ecg
-
-    while ser.in_waiting:
-
-        try:
-            raw = ser.readline().decode("utf-8", errors="ignore").strip()
-
-            if not raw:
-                continue
-
-            if raw == "NaN":
-                continue
-
-            parts = raw.split(",")
-
-            ecg = int(parts[0])
-
-            if len(parts) > 1:
+        def update(_frame):
+            while connection.in_waiting:
                 try:
-                    incoming_bpm = int(parts[1])
-                except Exception:
-                    incoming_bpm = None
-            else:
-                incoming_bpm = None
+                    raw = connection.readline().decode("utf-8", errors="ignore").strip()
+                    if not raw or raw.lower() == "nan":
+                        continue
+                    parts = raw.split(",")
+                    ecg = int(parts[0])
+                    if not 0 <= ecg <= 1023:
+                        continue
+                    incoming_rate = None
+                    if len(parts) > 1:
+                        try:
+                            incoming_rate = int(parts[1])
+                        except ValueError:
+                            pass
 
-            ecgs_for_threshold.append(ecg)
-            threshold = max(512, min(ecgs_for_threshold) + (max(ecgs_for_threshold) - min(ecgs_for_threshold)) * 0.5)
+                    recent_values.append(ecg)
+                    threshold = max(512, min(recent_values) + (max(recent_values) - min(recent_values)) * 0.5)
+                    now = time.perf_counter()
+                    if state["previous"] < threshold <= ecg and (not peaks or now - peaks[-1] >= 0.25):
+                        peaks.append(now)
+                        if len(peaks) >= 2:
+                            intervals = [b - a for a, b in zip(peaks, list(peaks)[1:])]
+                            state["rate"] = round(60 / (sum(intervals) / len(intervals)))
+                    state["previous"] = ecg
+                    if incoming_rate is not None and incoming_rate > 0:
+                        state["rate"] = incoming_rate
 
-            if last_ecg < threshold <= ecg:
-                bpm_peak_times.append(time.time())
-                if len(bpm_peak_times) >= 2:
-                    intervals = [
-                        bpm_peak_times[i] - bpm_peak_times[i - 1]
-                        for i in range(1, len(bpm_peak_times))
-                    ]
-                    avg_interval = sum(intervals) / len(intervals)
-                    current_bpm = int(round(60.0 / avg_interval))
+                    writer.writerow({
+                        "session_id": session_id,
+                        "timestamp": datetime.now().astimezone().isoformat(timespec="milliseconds"),
+                        "elapsed_seconds": f"{now - monotonic_start:.3f}",
+                        "sample_number": state["number"],
+                        "stimulus": stimulus,
+                        "time_of_day": time_of_day,
+                        "ecg": ecg,
+                        "bpm": state["rate"] or 0,
+                    })
+                    output.flush()
+                    samples.append(state["number"])
+                    values.append(ecg)
+                    state["number"] += 1
+                except (ValueError, IndexError):
+                    continue
+            line.set_data(samples, values)
+            axis.set_xlim(max(0, state["number"] - WINDOW_SIZE), max(WINDOW_SIZE, state["number"]))
+            rate_text.set_text(f"Event rate: {state['rate'] or 0}/min")
+            return line, rate_text
 
-            last_ecg = ecg
-
-            if incoming_bpm:
-                current_bpm = incoming_bpm
-
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-
-            writer.writerow([timestamp, ecg, current_bpm or 0])
-            csv_file.flush()
-
-            x.append(sample)
-            y.append(ecg)
-
-            sample += 1
-
-        except Exception:
-            continue
-
-    line.set_data(x, y)
-
-    ax.set_xlim(max(0, sample - WINDOW_SIZE), sample)
-
-    bpm_text.set_text(f"BPM: {current_bpm if current_bpm is not None else 0}")
-
-    return line, bpm_text
+        animation = FuncAnimation(figure, update, interval=20, cache_frame_data=False)
+        _ = animation
+        plt.show()
+    except serial.SerialException as error:
+        print(f"Could not open Arduino on {args.port}: {error}")
+        raise SystemExit(1) from error
+    except KeyboardInterrupt:
+        print("Recording stopped by user.")
+    finally:
+        if connection is not None and connection.is_open:
+            connection.close()
+        if output is not None:
+            output.close()
+        print("Recording closed safely.")
 
 
-ani = FuncAnimation(
-    fig,
-    update,
-    interval=20,
-    cache_frame_data=False,
-)
-
-try:
-    plt.show()
-
-finally:
-    print("Closing...")
-
-    ser.close()
-    csv_file.close()
-
-    print("CSV saved.")
+if __name__ == "__main__":
+    main()
