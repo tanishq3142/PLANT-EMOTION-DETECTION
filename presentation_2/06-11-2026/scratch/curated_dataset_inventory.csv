@@ -1,0 +1,27 @@
+filepath,filename,category,sub_label,sample_count
+csv\2026-08-11\plant_classical_music_for_plant_growth_morning_12hrs05min.csv,plant_classical_music_for_plant_growth_morning_12hrs05min.csv,Acoustic - Meditative/Mantras,Classical,59569
+csv\2026-08-11\plant_music_morning_10-12.csv,plant_music_morning_10-12.csv,Acoustic - High Energy/Pop,Morning Music,40508
+csv\2026-08-11\plant_normal_morning_11hrs39min.csv,plant_normal_morning_11hrs39min.csv,Normal Baseline (Control),Normal Baseline,116308
+csv\2026-08-11\plant_om_night_22hrs47min.csv,plant_om_night_22hrs47min.csv,Acoustic - Meditative/Mantras,Om Mantra,323057
+csv\2026-08-11\plant_water_morning_10-02.csv,plant_water_morning_10-02.csv,Water Stimulation,Water,1449
+csv\2026-08-11\plant_water_morning_11hrs50min.csv,plant_water_morning_11hrs50min.csv,Water Stimulation,Water,102075
+csv\2026-08-22\plant_normal_morning_09hrs38min.csv,plant_normal_morning_09hrs38min.csv,Normal Baseline (Control),Normal Baseline,215625
+csv\2026-09-22\plant_dead_morning_09hrs49min39sec.csv,plant_dead_morning_09hrs49min39sec.csv,Dead / Semi-Dead Control,Dead,16019
+csv\2026-09-22\plant_partial_dead_morning_09hrs58min05sec.csv,plant_partial_dead_morning_09hrs58min05sec.csv,Dead / Semi-Dead Control,Semi-Dead,6261
+csv\2026-09-28\plant_normal_morning_10hrs52min48sec.csv,plant_normal_morning_10hrs52min48sec.csv,Normal Baseline (Control),Normal Baseline,2112
+csv\2026-09-28\plant_normal_morning_10hrs56min10sec.csv,plant_normal_morning_10hrs56min10sec.csv,Normal Baseline (Control),Normal Baseline,3078
+csv\2026-09-28\plant_semi_dead_morning_11hrs05min43sec.csv,plant_semi_dead_morning_11hrs05min43sec.csv,Dead / Semi-Dead Control,Semi-Dead,3196
+csv\2026-10-09\plant_bye_bye_bye_afternoon_12hrs56min19sec.csv,plant_bye_bye_bye_afternoon_12hrs56min19sec.csv,Acoustic - High Energy/Pop,Pop (Bye Bye Bye),130329
+csv\2026-10-09\plant_hanuman_chalisa_afternoon_12hrs34min17sec.csv,plant_hanuman_chalisa_afternoon_12hrs34min17sec.csv,Acoustic - Meditative/Mantras,Hanuman Chalisa,16272
+csv\2026-10-09\plant_hare_krishna_afternoon_12hrs42min46sec.csv,plant_hare_krishna_afternoon_12hrs42min46sec.csv,Acoustic - Meditative/Mantras,Hare Krishna,14896
+csv\2026-10-09\plant_music_hare_krishna_afternoon_14hrs28min51sec.csv,plant_music_hare_krishna_afternoon_14hrs28min51sec.csv,Acoustic - Meditative/Mantras,Hare Krishna,28599
+csv\2026-10-09\plant_music_namami_shamisaan_afternoon_14hrs33min19sec.csv,plant_music_namami_shamisaan_afternoon_14hrs33min19sec.csv,Acoustic - Meditative/Mantras,Namami Shamisaan,30251
+csv\2026-10-09\plant_music_yalgaar_afternoon_13hrs16min40sec.csv,plant_music_yalgaar_afternoon_13hrs16min40sec.csv,Acoustic - High Energy/Pop,High Beat (Yalgaar),36616
+csv\2026-10-09\plant_music_yalgaar_afternoon_13hrs20min32sec.csv,plant_music_yalgaar_afternoon_13hrs20min32sec.csv,Acoustic - High Energy/Pop,High Beat (Yalgaar),30372
+csv\2026-10-09\plant_normal_afternoon_12hrs30min04sec.csv,plant_normal_afternoon_12hrs30min04sec.csv,Normal Baseline (Control),Normal Baseline,7075
+csv\2026-10-09\plant_normal_afternoon_12hrs31min13sec.csv,plant_normal_afternoon_12hrs31min13sec.csv,Normal Baseline (Control),Normal Baseline,2237
+csv\2026-10-09\plant_plant_om_mantra_afternoon_12hrs23min38sec.csv,plant_plant_om_mantra_afternoon_12hrs23min38sec.csv,Acoustic - Meditative/Mantras,Om Mantra,31483
+csv\2026-10-09\plant_plant_pop_music_bye_bye_bye_afternoon_13hrs08min23sec.csv,plant_plant_pop_music_bye_bye_bye_afternoon_13hrs08min23sec.csv,Acoustic - High Energy/Pop,Pop (Bye Bye Bye),31401
+csv\2026-10-09\plant_with_water_afternoon_15hrs48min05sec.csv,plant_with_water_afternoon_15hrs48min05sec.csv,Water Stimulation,Water,6895
+csv\2026-10-09\plant_without_music_afternoon_15hrs38min49sec.csv,plant_without_music_afternoon_15hrs38min49sec.csv,Normal Baseline (Control),Normal Baseline,10535
+csv\2026-10-09\plant_without_music_afternoon_15hrs53min26sec.csv,plant_without_music_afternoon_15hrs53min26sec.csv,Normal Baseline (Control),Normal Baseline,9734
