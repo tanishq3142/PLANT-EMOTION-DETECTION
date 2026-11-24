@@ -80,6 +80,14 @@ python plot_csv.py csv/2026-08-11/plant_water_morning_11hrs50min.csv
 
 The plot displays raw ADC readings and estimated event rate. It also updates while another process is adding rows to the CSV.
 
+To create a PNG waveform for every populated recording in `categorize csv/`, grouped into matching class folders under `categorize csv plots/`, run:
+
+```powershell
+python generate_categorized_plots.py
+```
+
+The script plots at most the first 1,000 samples from each recording, reads the `ecg` column by default, skips empty CSVs, and preserves nested subcategories such as music genres. Use `--input-dir`, `--output-dir`, or `--signal-column` to select different paths or a different signal column.
+
 ## 3. Collect training data
 
 Before training, collect multiple independent sessions for each label. The code requires at least two sessions per label, but reliable research needs substantially more sessions and multiple plants.
